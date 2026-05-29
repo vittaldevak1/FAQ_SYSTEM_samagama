@@ -62,15 +62,30 @@ exports.chatQuery = async (req, res, next) => {
       return next(new AppError('Message is required', 400));
     }
 
-    const STOP_WORDS = new Set(['the', 'this', 'that', 'what', 'when', 'where', 'which', 'who', 'whom', 'how', 'why', 'and', 'but', 'for', 'not', 'you', 'your', 'with', 'can', 'all', 'are', 'was', 'has', 'had', 'its', 'our', 'their', 'will', 'have', 'been', 'does', 'did', 'get', 'got', 'may', 'just', 'about', 'into', 'than', 'then', 'very']);
-    const query = message.trim().toLowerCase();
-    const words = query.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+    const query = message.trim();
 
     const allFaqs = await Faq.find({ isActive: true }).select('+embedding');
 
     if (allFaqs.length === 0) {
       return res.json({ success: true, found: false, message: 'No FAQs available yet.' });
     }
+
+    const semanticResults = await ragService.searchSimilarInMemory(query, allFaqs, 3, 0.4);
+
+    if (semanticResults.length > 0) {
+      return res.json({
+        success: true,
+        found: true,
+        answer: semanticResults[0].answer,
+        question: semanticResults[0].question,
+        category: semanticResults[0].category,
+        score: semanticResults[0].score,
+      });
+    }
+
+    const STOP_WORDS = new Set(['the', 'this', 'that', 'what', 'when', 'where', 'which', 'who', 'whom', 'how', 'why', 'and', 'but', 'for', 'not', 'you', 'your', 'with', 'can', 'all', 'are', 'was', 'has', 'had', 'its', 'our', 'their', 'will', 'have', 'been', 'does', 'did', 'get', 'got', 'may', 'just', 'about', 'into', 'than', 'then', 'very']);
+    const qLower = query.toLowerCase();
+    const words = qLower.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
 
     let bestMatch = null;
     let bestScore = 0;
@@ -109,8 +124,8 @@ exports.chatQuery = async (req, res, next) => {
     const textResult = await Faq.findOne({
       isActive: true,
       $or: [
-        { question: { $regex: query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
-        { tags: { $regex: query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { question: { $regex: qLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { tags: { $regex: qLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
       ],
     });
 
@@ -153,9 +168,21 @@ exports.searchFAQs = async (req, res, next) => {
       ],
     }).limit(10);
 
-    const results = [...textResults];
+    const seenIds = new Set(textResults.map(f => f._id.toString()));
+    const combined = [...textResults];
 
-    res.json({ success: true, count: results.length, results });
+    const allFaqs = await Faq.find({ isActive: true }).select('+embedding').limit(50);
+    if (allFaqs.length > 0) {
+      const semanticResults = await ragService.searchSimilarInMemory(query, allFaqs, 5, 0.3);
+      for (const sr of semanticResults) {
+        if (!seenIds.has(sr._id.toString())) {
+          combined.push(sr);
+          seenIds.add(sr._id.toString());
+        }
+      }
+    }
+
+    res.json({ success: true, count: combined.length, results: combined });
   } catch (err) {
     next(err);
   }

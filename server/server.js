@@ -15,6 +15,7 @@ const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const faqRoutes = require('./routes/faqRoutes');
 const queryRoutes = require('./routes/queryRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/queries', queryRoutes);
+app.use('/api/search', searchRoutes);
 
 app.all('*', (req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
@@ -126,6 +128,12 @@ const startServer = async () => {
     ragService.initChroma();
 
     await seedFAQs();
+
+    const allFaqs = await Faq.find({ isActive: true });
+    if (allFaqs.length > 0) {
+      const seeded = await ragService.seedFAQs(allFaqs);
+      if (seeded > 0) console.log(`Search: Seeded ${seeded} FAQs into ChromaDB`);
+    }
 
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);

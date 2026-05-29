@@ -31,6 +31,18 @@ const faqSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    views: {
+      type: Number,
+      default: 0,
+    },
+    createdBy: {
+      type: String,
+      default: 'system',
+    },
+    isOutdated: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

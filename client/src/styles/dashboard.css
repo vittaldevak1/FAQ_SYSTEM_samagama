@@ -106,6 +106,25 @@
   color: var(--accent);
 }
 
+.dash-search-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.dash-search-btn:hover {
+  background: var(--accent-hover, #4f46e5);
+  border-color: var(--accent);
+}
+
 /* ===== Main Content ===== */
 .dash-main {
   flex: 1;
