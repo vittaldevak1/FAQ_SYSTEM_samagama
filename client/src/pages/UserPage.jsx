@@ -3,6 +3,13 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
+const CATEGORIES = [
+  'about-internship', 'certificate', 'code-of-conduct', 'coursework-vibe',
+  'interviews', 'noc', 'rosetta', 'selection-offer', 'team-formation',
+  'timing-dates', 'vibe-platform', 'work-mentorship', 'yaksha-chat',
+  'programme-overview',
+];
+
 export default function UserPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -16,8 +23,10 @@ export default function UserPage() {
   const [overview, setOverview] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState(null);
   const debounceRef = useRef(null);
   const searchRef = useRef(null);
+  const overviewRef = useRef(null);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -185,6 +194,41 @@ export default function UserPage() {
           )}
         </div>
 
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+          {CATEGORIES.map(cat => {
+            const active = cat === activeCategory;
+            const label = cat === 'programme-overview' ? 'Programme Overview' : cat.replace(/-/g, ' ');
+            return (
+              <button
+                key={cat}
+                onClick={() => {
+                  if (cat === 'programme-overview') {
+                    setQuery('');
+                    setShowResults(false);
+                    setActiveCategory(null);
+                    setOverviewOpen(true);
+                    setTimeout(() => overviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                  } else {
+                    setActiveCategory(activeCategory === cat ? null : cat);
+                    setExpanded(prev => ({ ...prev, [cat]: true }));
+                  }
+                }}
+                style={{
+                  padding: '6px 14px', borderRadius: '20px', border: '1px solid var(--border)',
+                  fontSize: 13, fontWeight: cat === activeCategory ? 600 : 400,
+                  background: cat === activeCategory ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color: cat === activeCategory ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms ease', textTransform: 'capitalize'
+                }}
+                onMouseOver={e => { if (cat !== activeCategory) { e.currentTarget.style.background = 'var(--accent-light)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}}
+                onMouseOut={e => { if (cat !== activeCategory) { e.currentTarget.style.background = 'var(--bg-secondary)'; e.currentTarget.style.borderColor = 'var(--border)'; }}}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         {faqsLoading ? (
           <div>
             {[1, 2, 3, 4, 5].map(i => (
@@ -193,7 +237,7 @@ export default function UserPage() {
           </div>
         ) : (
           <div>
-            {faqs.map(([cat, items]) => (
+            {(activeCategory ? faqs.filter(([c]) => c === activeCategory) : faqs).map(([cat, items]) => (
               <div key={cat} style={{
                 background: 'var(--bg-card)', backdropFilter: 'blur(16px)',
                 border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
@@ -235,7 +279,7 @@ export default function UserPage() {
           </div>
         )}
 
-        <div style={{
+        <div ref={overviewRef} style={{
           background: 'var(--bg-card)', backdropFilter: 'blur(16px)',
           border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
           marginTop: 24, overflow: 'hidden'
