@@ -13,6 +13,7 @@ const CATEGORY_LABELS = {
   'technical-support': { label: 'Support', icon: '🔧' },
   certifications: { label: 'Certifications', icon: '🎓' },
   'privacy-security': { label: 'Privacy', icon: '🔒' },
+  internship: { label: 'Internship', icon: '💼' },
 };
 
 export default function UserDashboard() {

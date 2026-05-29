@@ -8,6 +8,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 const Faq = require('./models/Faq');
 const { fetchFAQs, getSampleFAQs } = require('./services/scraper');
+const { INTERNSHIP_FAQS } = require('./services/internshipFaqs');
 const ragService = require('./services/ragService');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
@@ -61,9 +62,9 @@ const seedFAQs = async () => {
       return;
     }
 
-    const faqs = getSampleFAQs();
+    const faqs = [...getSampleFAQs(), ...INTERNSHIP_FAQS];
     const faqDocs = await Faq.insertMany(faqs);
-    console.log(`FAQs: Seeded ${faqDocs.length} sample FAQs`);
+    console.log(`FAQs: Seeded ${faqDocs.length} FAQs (${getSampleFAQs().length} sample + ${INTERNSHIP_FAQS.length} internship)`);
 
     const embeddings = [];
     for (const faq of faqDocs) {
