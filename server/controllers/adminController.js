@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Answer = require('../models/Answer');
+const Question = require('../models/Question');
 const AuditLog = require('../models/AuditLog');
 const { AppError } = require('../middleware/errorHandler');
 
@@ -132,13 +134,14 @@ exports.getStats = async (req, res, next) => {
     const Question = require('../models/Question');
     const Answer = require('../models/Answer');
     const Faq = require('../models/Faq');
-    const [totalUsers, totalQuestions, totalAnswers, totalFaqs] = await Promise.all([
+    const [totalUsers, totalQuestions, totalAnswers, totalFaqs, pendingAnswers] = await Promise.all([
       User.countDocuments(),
       Question.countDocuments(),
       Answer.countDocuments(),
       Faq.countDocuments(),
+      Answer.countDocuments({ status: 'pending' }),
     ]);
-    res.json({ success: true, totalUsers, totalQuestions, totalAnswers, totalFaqs });
+    res.json({ success: true, totalUsers, totalQuestions, totalAnswers, totalFaqs, pendingAnswers });
   } catch (err) { next(err); }
 };
 
@@ -233,6 +236,27 @@ exports.getAuditLogs = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(100);
     res.json({ success: true, logs });
+  } catch (err) { next(err); }
+};
+
+exports.getPendingAnswers = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    const [answers, total] = await Promise.all([
+      Answer.find({ status: 'pending' })
+        .populate('author', 'name email')
+        .populate('question', 'title')
+        .sort({ createdAt: -1 })
+        .skip(skip).limit(limit),
+      Answer.countDocuments({ status: 'pending' }),
+    ]);
+    res.json({
+      success: true,
+      answers,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
   } catch (err) { next(err); }
 };
 

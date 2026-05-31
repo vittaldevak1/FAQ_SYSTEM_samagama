@@ -26,7 +26,18 @@ const { setupSocket } = require('./services/socketService');
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://accounts.google.com"],
+      frameSrc: ["'self'", "https://accounts.google.com"],
+      connectSrc: ["'self'", "https://accounts.google.com"],
+      imgSrc: ["'self'", "data:", "https://*.googleusercontent.com"],
+    },
+  },
+}));
 app.use(cors({
   origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:5174'],
   credentials: true,

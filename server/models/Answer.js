@@ -27,6 +27,16 @@ const answerSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved',
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  reviewedAt: Date,
 }, { timestamps: true });
 
 module.exports = mongoose.model('Answer', answerSchema);

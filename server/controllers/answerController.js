@@ -13,10 +13,12 @@ const createAnswer = async (req, res) => {
   }
 
   try {
+    const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
     const answer = await Answer.create({
       content,
       question: questionId,
-      author: req.user._id
+      author: req.user._id,
+      status: isAdmin ? 'approved' : 'pending',
     });
 
     await Question.findByIdAndUpdate(questionId, { status: 'answered' });
@@ -43,7 +45,10 @@ const createAnswer = async (req, res) => {
 // Get all answers for a specific question
 const getAnswersByQuestionId = async (req, res) => {
   try {
-    const answers = await Answer.find({ question: req.params.questionId })
+    const isAdmin = ['admin', 'super_admin'].includes(req.user.role);
+    const filter = { question: req.params.questionId };
+    if (!isAdmin) filter.status = 'approved';
+    const answers = await Answer.find(filter)
       .populate('author', 'name email points')
       .sort({ createdAt: 1 });
     res.json(answers);
@@ -182,6 +187,50 @@ const acceptAnswer = async (req, res) => {
   }
 };
 
+// Approve answer (Admin only)
+const approveAnswer = async (req, res) => {
+  try {
+    const answer = await Answer.findByIdAndUpdate(
+      req.params.id,
+      { status: 'approved', reviewedBy: req.user._id, reviewedAt: new Date() },
+      { new: true }
+    );
+    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+
+    const question = await Question.findById(answer.question).select('author title');
+    if (question && question.author.toString() !== answer.author.toString()) {
+      const notif = await Notification.create({
+        recipient: answer.author,
+        type: 'answer_approved',
+        title: 'Your Answer Was Approved',
+        message: `"${question.title.slice(0, 60)}" answer was approved`,
+        link: `/questions/${answer.question}`,
+        relatedId: answer.question,
+      });
+      notifyUser(answer.author, notif);
+    }
+
+    res.json({ success: true, answer });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Reject answer (Admin only)
+const rejectAnswer = async (req, res) => {
+  try {
+    const answer = await Answer.findByIdAndUpdate(
+      req.params.id,
+      { status: 'rejected', reviewedBy: req.user._id, reviewedAt: new Date() },
+      { new: true }
+    );
+    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+    res.json({ success: true, answer });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createAnswer,
   getAnswersByQuestionId,
@@ -189,4 +238,6 @@ module.exports = {
   upvoteAnswer,
   downvoteAnswer,
   acceptAnswer,
+  approveAnswer,
+  rejectAnswer,
 };

@@ -25,6 +25,9 @@ router.delete('/users/:id', isAdmin, adminController.deleteUser);
 router.patch('/questions/:id/good-question', adminController.markGoodQuestion);
 router.post('/questions/:id/promote-faq', adminController.promoteQuestionToFaq);
 
+// Pending answers moderation
+router.get('/answers/pending', adminController.getPendingAnswers);
+
 // FAQ CRUD (super_admin only)
 router.get('/faqs', isSuperAdmin, adminController.getAllFaqs);
 router.post('/faqs', isSuperAdmin, adminController.createFaq);

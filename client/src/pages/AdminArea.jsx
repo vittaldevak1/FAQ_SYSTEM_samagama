@@ -62,6 +62,10 @@ const AdminArea = () => {
   const [queries, setQueries] = useState([]);
   const [faqs, setFaqs] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [pendingAnswers, setPendingAnswers] = useState([]);
+  const [pendingAnswersPagination, setPendingAnswersPagination] = useState(null);
+  const [answersPage, setAnswersPage] = useState(1);
+  const [answersLoading, setAnswersLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -79,6 +83,7 @@ const AdminArea = () => {
   useEffect(() => {
     if (activeTab === 'faq manager' && isSuperAdmin) fetchFaqs();
     if (activeTab === 'audit log' && isSuperAdmin) fetchAuditLogs();
+    if (activeTab === 'pending answers') fetchPendingAnswers();
   }, [activeTab]);
 
   const fetchData = async () => {
@@ -97,6 +102,31 @@ const AdminArea = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchPendingAnswers = async (page = 1) => {
+    setAnswersLoading(true);
+    try {
+      const { data } = await api.get(`/admin/answers/pending?page=${page}&limit=20`);
+      setPendingAnswers(data.answers || []);
+      setPendingAnswersPagination(data.pagination);
+      setAnswersPage(page);
+    } catch { setPendingAnswers([]); }
+    finally { setAnswersLoading(false); }
+  };
+
+  const handleApproveAnswer = async (id) => {
+    try {
+      await api.put(`/answers/${id}/approve`);
+      fetchPendingAnswers(answersPage);
+    } catch { alert('Failed to approve answer'); }
+  };
+
+  const handleRejectAnswer = async (id) => {
+    try {
+      await api.put(`/answers/${id}/reject`);
+      fetchPendingAnswers(answersPage);
+    } catch { alert('Failed to reject answer'); }
   };
 
   const fetchFaqs = async () => {
@@ -253,7 +283,7 @@ const AdminArea = () => {
   if (error) return <div className="alert-error">{error}</div>;
 
   const openQueries = queries.filter(q => q.status === 'open');
-  const tabs = ['overview', 'questions', 'users', 'unresolved queries',
+  const tabs = ['overview', 'questions', 'users', 'unresolved queries', 'pending answers',
     ...(isSuperAdmin ? ['faq manager', 'audit log'] : [])
   ];
 
@@ -318,6 +348,11 @@ const AdminArea = () => {
             {tab === 'unresolved queries' && openQueries.length > 0 && (
               <span style={{ marginLeft: 6, background: '#ef4444', color: '#fff', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>
                 {openQueries.length}
+              </span>
+            )}
+            {tab === 'pending answers' && stats?.pendingAnswers > 0 && (
+              <span style={{ marginLeft: 6, background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>
+                {stats.pendingAnswers}
               </span>
             )}
           </button>
@@ -497,6 +532,49 @@ const AdminArea = () => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pending Answers Tab */}
+      {activeTab === 'pending answers' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {answersLoading && <p style={{ color: 'var(--text-muted)' }}>Loading...</p>}
+          {!answersLoading && pendingAnswers.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No pending answers 🎉</p>}
+          {pendingAnswers.map(a => (
+            <div key={a._id} style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)', padding: '16px 20px', transition: 'all 0.15s'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{a.author?.name || 'Unknown'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                    {a.author?.email} · {new Date(a.createdAt).toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6, whiteSpace: 'pre-wrap' }}>{a.content?.slice(0, 300)}{a.content?.length > 300 ? '...' : ''}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Question: <strong>{a.question?.title || 'Deleted question'}</strong>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => handleApproveAnswer(a._id)} style={{ padding: '7px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--success)', background: 'rgba(16,185,129,0.08)', color: 'var(--success)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✓ Approve</button>
+                  <button onClick={() => handleRejectAnswer(a._id)} style={{ padding: '7px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--error)', background: 'rgba(220,38,38,0.08)', color: 'var(--error)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>✕ Reject</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {pendingAnswersPagination?.pages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+              {Array.from({ length: pendingAnswersPagination.pages }, (_, i) => (
+                <button key={i + 1} onClick={() => fetchPendingAnswers(i + 1)} style={{
+                  padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+                  background: answersPage === i + 1 ? 'var(--accent)' : 'transparent',
+                  color: answersPage === i + 1 ? '#fff' : 'var(--text-secondary)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit'
+                }}>{i + 1}</button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
