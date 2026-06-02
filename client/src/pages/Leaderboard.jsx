@@ -31,7 +31,7 @@ const Leaderboard = () => {
 
       {leaderboard.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)', fontSize: 14 }}>
-          No points earned yet. Start answering questions!
+          No users on the leaderboard yet.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

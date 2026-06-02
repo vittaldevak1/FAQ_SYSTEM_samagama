@@ -6,10 +6,12 @@ const router = Router();
 const isAdmin = authorizeRoles('super_admin', 'admin');
 const isSuperAdmin = authorizeRoles('super_admin');
 
+// Leaderboard — visible to all authenticated users
 router.get('/leaderboard', authenticateUser, adminController.getLeaderboard);
+
 router.use(authenticateUser, isAdmin);
 
-// Stats, users, leaderboard
+// Stats, users
 router.get('/stats', adminController.getStats);
 router.get('/users', adminController.getUsers);
 router.get('/users/:id', adminController.getUserById);
