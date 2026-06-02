@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import adminService from '../services/adminService';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 // Custom animated checkbox
 const Checkbox = ({ checked, onChange }) => (
@@ -79,6 +80,8 @@ const AdminArea = () => {
   const [selectedQueries, setSelectedQueries] = useState(new Set());
   const [respondModal, setRespondModal] = useState({ open: false, query: null, response: '' });
   const [toast, setToast] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const waitConfirm = (opts) => new Promise(resolve => { setConfirm({ ...opts, resolve }); });
 
   useEffect(() => { fetchData(); }, []);
 
@@ -155,79 +158,87 @@ const AdminArea = () => {
   };
 
   const handleDeleteQuestion = async (id) => {
-    if (!window.confirm('Delete this question?')) return;
+    const ok = await waitConfirm({ title: 'Delete Question', message: 'Delete this question?', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try {
       const { default: questionService } = await import('../services/questionService');
       await questionService.deleteQuestion(id);
       fetchData();
-    } catch { alert('Failed to delete question'); }
+    } catch { setToast({ type: 'error', message: 'Failed to delete question' }); }
   };
 
   const handleBulkDeleteQuestions = async () => {
     if (!selectedQuestions.size) return;
-    if (!window.confirm(`Delete ${selectedQuestions.size} question(s)?`)) return;
+    const ok = await waitConfirm({ title: 'Delete Questions', message: `Delete ${selectedQuestions.size} question(s)?`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try {
       const { default: questionService } = await import('../services/questionService');
       await Promise.all([...selectedQuestions].map(id => questionService.deleteQuestion(id)));
       setSelectedQuestions(new Set());
       fetchData();
-    } catch { alert('Failed to delete some questions'); }
+    } catch { setToast({ type: 'error', message: 'Failed to delete some questions' }); }
   };
 
   const handleBulkDeleteUsers = async () => {
     if (!selectedUsers.size) return;
-    if (!window.confirm(`Delete ${selectedUsers.size} user(s)?`)) return;
+    const ok = await waitConfirm({ title: 'Delete Users', message: `Delete ${selectedUsers.size} user(s)?`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try {
       await Promise.all([...selectedUsers].map(id => adminService.deleteUser(id)));
       setSelectedUsers(new Set());
       fetchData();
-    } catch { alert('Failed to delete some users'); }
+    } catch { setToast({ type: 'error', message: 'Failed to delete some users' }); }
   };
 
   const handleBulkDeleteQueries = async () => {
     if (!selectedQueries.size) return;
-    if (!window.confirm(`Delete ${selectedQueries.size} query(ies)?`)) return;
+    const ok = await waitConfirm({ title: 'Delete Queries', message: `Delete ${selectedQueries.size} query(ies)?`, confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try {
       await Promise.all([...selectedQueries].map(id => api.delete(`/queries/${id}`)));
       setSelectedQueries(new Set());
       fetchData();
-    } catch { alert('Failed to delete some queries'); }
+    } catch { setToast({ type: 'error', message: 'Failed to delete some queries' }); }
   };
 
   const handlePromoteToFaq = async (q) => {
     try {
       await adminService.createFaq({ question: q.title, answer: q.title, category: 'general' });
-      alert('Successfully promoted to FAQ!');
-    } catch { alert('Failed to promote to FAQ'); }
+      setToast({ type: 'success', message: 'Successfully promoted to FAQ!' });
+    } catch { setToast({ type: 'error', message: 'Failed to promote to FAQ' }); }
   };
 
   const handlePromoteUser = async (id) => {
-    if (!window.confirm('Promote this user to admin?')) return;
+    const ok = await waitConfirm({ title: 'Promote User', message: 'Promote this user to admin?', confirmLabel: 'Promote' });
+    if (!ok) return;
     try { await adminService.promoteUser(id); fetchData(); }
-    catch (err) { alert(err.response?.data?.message || 'Failed to promote user'); }
+    catch (err) { setToast({ type: 'error', message: err.response?.data?.message || 'Failed to promote user' }); }
   };
 
   const handlePromoteToSuperAdmin = async (id) => {
-    if (!window.confirm('Promote this user to super_admin?')) return;
+    const ok = await waitConfirm({ title: 'Promote to Super Admin', message: 'Promote this user to super_admin?', confirmLabel: 'Promote' });
+    if (!ok) return;
     try { await adminService.promoteToSuperAdmin(id); fetchData(); }
-    catch (err) { alert(err.response?.data?.message || 'Failed'); }
+    catch (err) { setToast({ type: 'error', message: err.response?.data?.message || 'Failed' }); }
   };
 
   const handleDemoteAdmin = async (id) => {
-    if (!window.confirm('Demote this user to intern?')) return;
+    const ok = await waitConfirm({ title: 'Demote User', message: 'Demote this user to intern?', confirmLabel: 'Demote', variant: 'danger' });
+    if (!ok) return;
     try { await adminService.demoteAdmin(id); fetchData(); }
-    catch (err) { alert(err.response?.data?.message || 'Failed to demote'); }
+    catch (err) { setToast({ type: 'error', message: err.response?.data?.message || 'Failed to demote' }); }
   };
 
   const handleDeleteUser = async (id) => {
-    if (!window.confirm('Delete this user? This cannot be undone.')) return;
+    const ok = await waitConfirm({ title: 'Delete User', message: 'Delete this user? This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try { await adminService.deleteUser(id); fetchData(); }
-    catch (err) { alert(err.response?.data?.message || 'Failed to delete user'); }
+    catch (err) { setToast({ type: 'error', message: err.response?.data?.message || 'Failed to delete user' }); }
   };
 
   const handleResolveQuery = async (id, response) => {
     try { await api.patch(`/queries/${id}/respond`, { response, status: 'resolved' }); fetchData(); }
-    catch { alert('Failed to resolve query'); }
+    catch { setToast({ type: 'error', message: 'Failed to resolve query' }); }
   };
 
   const handlePromoteQueryToFaq = async (q) => {
@@ -240,15 +251,16 @@ const AdminArea = () => {
   };
 
   const handleDeleteQuery = async (id) => {
-    if (!window.confirm('Delete this query?')) return;
+    const ok = await waitConfirm({ title: 'Delete Query', message: 'Delete this query?', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try { await api.delete(`/queries/${id}`); fetchData(); }
-    catch { alert('Failed to delete query'); }
+    catch { setToast({ type: 'error', message: 'Failed to delete query' }); }
   };
 
   // FAQ Manager handlers
   const handleFaqSubmit = async () => {
     if (!faqForm.question || !faqForm.answer || !faqForm.category) {
-      alert('All fields required'); return;
+      setToast({ type: 'error', message: 'All fields required' }); return;
     }
     setFaqLoading(true);
     try {
@@ -260,7 +272,7 @@ const AdminArea = () => {
       setFaqForm({ question: '', answer: '', category: '' });
       setEditingFaq(null);
       fetchFaqs();
-    } catch (err) { alert(err.response?.data?.message || 'Failed to save FAQ'); }
+    } catch (err) { setToast({ type: 'error', message: err.response?.data?.message || 'Failed to save FAQ' }); }
     finally { setFaqLoading(false); }
   };
 
@@ -270,9 +282,10 @@ const AdminArea = () => {
   };
 
   const handleDeleteFaq = async (id) => {
-    if (!window.confirm('Delete this FAQ? It will be removed from search too.')) return;
+    const ok = await waitConfirm({ title: 'Delete FAQ', message: 'Delete this FAQ? It will be removed from search too.', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
     try { await adminService.deleteFaq(id); fetchFaqs(); }
-    catch { alert('Failed to delete FAQ'); }
+    catch { setToast({ type: 'error', message: 'Failed to delete FAQ' }); }
   };
 
   if (loading) return <div style={{ padding: 40, color: 'var(--text-muted)' }}>Loading admin area...</div>;
@@ -573,7 +586,7 @@ const AdminArea = () => {
             {!a.isAccepted && (
               <button onClick={async () => {
                 try { await api.put(`/answers/${a._id}/accept`); fetchPendingAnswers(); }
-                catch { alert('Failed to accept'); }
+                catch { setToast({ type: 'error', message: 'Failed to accept' }); }
               }} style={{
                 padding: '7px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--success)',
                 background: 'rgba(16,185,129,0.08)', color: 'var(--success)',
@@ -581,9 +594,10 @@ const AdminArea = () => {
               }}>✓ Accept</button>
             )}
             <button onClick={async () => {
-              if (!window.confirm('Delete this answer?')) return;
+              const ok = await waitConfirm({ title: 'Delete Answer', message: 'Delete this answer?', confirmLabel: 'Delete', variant: 'danger' });
+              if (!ok) return;
               try { await api.delete(`/answers/${a._id}`); fetchPendingAnswers(); }
-              catch { alert('Failed to delete'); }
+              catch { setToast({ type: 'error', message: 'Failed to delete' }); }
             }} style={{
               padding: '7px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--error)',
               background: 'rgba(220,38,38,0.08)', color: 'var(--error)',
@@ -591,9 +605,10 @@ const AdminArea = () => {
             }}>🗑 Delete</button>
             {a.author?.role !== 'super_admin' && (
               <button onClick={async () => {
-                if (!window.confirm(`Ban ${a.author?.name}? This will delete their account.`)) return;
+                const ok = await waitConfirm({ title: 'Ban User', message: `Ban ${a.author?.name}? This will delete their account.`, confirmLabel: 'Ban', variant: 'danger' });
+                if (!ok) return;
                 try { await adminService.deleteUser(a.author._id); fetchPendingAnswers(); fetchData(); }
-                catch { alert('Failed to ban user'); }
+                catch { setToast({ type: 'error', message: 'Failed to ban user' }); }
               }} style={{
                 padding: '7px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid #f59e0b',
                 background: 'rgba(245,158,11,0.08)', color: '#f59e0b',
@@ -696,6 +711,18 @@ const AdminArea = () => {
           </div>
         </div>
       )}
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        open={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        cancelLabel={confirm?.cancelLabel}
+        variant={confirm?.variant}
+        onConfirm={() => { confirm?.resolve(true); setConfirm(null); }}
+        onCancel={() => { confirm?.resolve(false); setConfirm(null); }}
+      />
 
       {/* Respond Modal */}
       {respondModal.open && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import questionService from '../services/questionService';
 import answerService from '../services/answerService';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const AnswerCenter = () => {
   const { user, refreshUser } = useAuth();
@@ -61,7 +62,7 @@ const AnswerCenter = () => {
   const handleSubmitAnswer = async (questionId) => {
     const content = newAnswer[questionId] || '';
     if (!content.trim()) return;
-    if (content.trim().length < 100) { alert('Answer must be at least 100 characters.'); return; }
+    if (content.trim().length < 10) { toast.error('Answer must be at least 10 characters.'); return; }
     setSubmitting(prev => ({ ...prev, [questionId]: true }));
     try {
       await answerService.createAnswer({ content, questionId });
@@ -69,7 +70,7 @@ const AnswerCenter = () => {
       fetchAnswers(questionId);
       fetchQuestions();
       refreshUser();
-    } catch { alert('Failed to submit answer'); }
+    } catch { toast.error('Failed to submit answer'); }
     finally { setSubmitting(prev => ({ ...prev, [questionId]: false })); }
   };
 
@@ -340,7 +341,7 @@ const AnswerCenter = () => {
                         <textarea
                           value={answerText}
                           onChange={e => setNewAnswer(prev => ({ ...prev, [q._id]: e.target.value }))}
-                          placeholder="Write your reply (minimum 100 characters)..."
+                          placeholder="Write your reply (minimum 10 characters)..."
                           style={{
                             width: '100%', minHeight: 90, padding: '10px 12px',
                             borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
@@ -365,9 +366,9 @@ const AnswerCenter = () => {
                           >{submitting[q._id] ? 'Posting...' : 'Post Reply'}</button>
                           <span style={{
                             fontSize: 12, fontWeight: 500,
-                            color: answerText.length === 0 ? 'var(--text-muted)' : answerText.length < 100 ? 'var(--error)' : 'var(--success)'
+                            color: answerText.length === 0 ? 'var(--text-muted)' : answerText.length < 10 ? 'var(--error)' : 'var(--success)'
                           }}>
-                            {answerText.length} / 100
+                            {answerText.length} / 10
                           </span>
                         </div>
                       </div>

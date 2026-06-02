@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import questionService from '../services/questionService';
 import answerService from '../services/answerService';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 const QuestionDetail = () => {
   const { id } = useParams();
@@ -12,6 +14,8 @@ const QuestionDetail = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user, refreshUser } = useAuth();
+  const [confirm, setConfirm] = useState(null);
+  const waitConfirm = (opts) => new Promise(resolve => { setConfirm({ ...opts, resolve }); });
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -31,8 +35,8 @@ const QuestionDetail = () => {
   const handleAnswerSubmit = async (e) => {
     e.preventDefault();
     if (!newAnswer.trim()) return;
-    if (newAnswer.trim().length < 100) {
-      alert('Answer must be at least 100 characters.');
+    if (newAnswer.trim().length < 10) {
+      toast.error('Answer must be at least 10 characters.');
       return;
     }
     try {
@@ -41,28 +45,28 @@ const QuestionDetail = () => {
       fetchData();
       refreshUser();
     } catch (err) {
-      alert('Failed to submit answer');
+      toast.error('Failed to submit answer');
     }
   };
 
   const handleDeleteAnswer = async (answerId) => {
-    if (window.confirm('Delete this answer?')) {
-      try {
-        await answerService.deleteAnswer(answerId);
-        fetchData();
-        refreshUser();
-      } catch { alert('Failed to delete answer'); }
-    }
+    const ok = await waitConfirm({ title: 'Delete Answer', message: 'Delete this answer?', confirmLabel: 'Delete', variant: 'danger' });
+    if (!ok) return;
+    try {
+      await answerService.deleteAnswer(answerId);
+      fetchData();
+      refreshUser();
+    } catch { toast.error('Failed to delete answer'); }
   };
 
   const handleUpvote = async (answerId) => {
     try { await answerService.upvoteAnswer(answerId); fetchData(); refreshUser(); }
-    catch { alert('Failed to upvote'); }
+    catch { toast.error('Failed to upvote'); }
   };
 
   const handleDownvote = async (answerId) => {
     try { await answerService.downvoteAnswer(answerId); fetchData(); refreshUser(); }
-    catch { alert('Failed to downvote'); }
+    catch { toast.error('Failed to downvote'); }
   };
 
   const isVoted = (arr) => arr?.some(id => id.toString() === (user?._id || user?.id)?.toString());
@@ -162,7 +166,7 @@ const QuestionDetail = () => {
                     {!ans.isAccepted && (
                       <button onClick={async () => {
                         try { await answerService.acceptAnswer(ans._id); fetchData(); refreshUser(); }
-                        catch { alert('Failed to accept answer'); }
+                        catch { toast.error('Failed to accept answer'); }
                       }} style={{
                         padding: '0.25rem 0.6rem', fontSize: '0.8rem', cursor: 'pointer',
                         background: 'rgba(16,185,129,0.08)', border: '1px solid var(--success)',
@@ -184,25 +188,36 @@ const QuestionDetail = () => {
 
       <div className="glass-card">
         <h4 style={{ marginBottom: '0.5rem' }}>Post an Answer</h4>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: '1rem' }}>Minimum 100 characters required.</p>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: '1rem' }}>Minimum 10 characters required.</p>
         <form onSubmit={handleAnswerSubmit} className="flex-col">
           <textarea
             className="form-input"
             value={newAnswer}
             onChange={(e) => setNewAnswer(e.target.value)}
-            placeholder="Write your answer here (minimum 100 characters)..."
+            placeholder="Write your answer here (minimum 10 characters)..."
             style={{ minHeight: '100px', resize: 'vertical' }}
           />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <button type="submit" className="btn-primary" style={{ width: 'max-content' }}>
               Submit Answer
             </button>
-            <span style={{ fontSize: 12, color: newAnswer.length < 100 ? 'var(--error)' : 'var(--success)' }}>
-              {newAnswer.length}/100 chars
+            <span style={{ fontSize: 12, color: newAnswer.length < 10 ? 'var(--error)' : 'var(--success)' }}>
+              {newAnswer.length}/10 chars
             </span>
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        open={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        cancelLabel={confirm?.cancelLabel}
+        variant={confirm?.variant}
+        onConfirm={() => { confirm?.resolve(true); setConfirm(null); }}
+        onCancel={() => { confirm?.resolve(false); setConfirm(null); }}
+      />
     </div>
   );
 };
