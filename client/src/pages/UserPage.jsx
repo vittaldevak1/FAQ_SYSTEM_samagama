@@ -20,6 +20,7 @@ const CATEGORIES = [
 export default function UserPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [searchFaqIds, setSearchFaqIds] = useState(null);
   const [semanticLoading, setSemanticLoading] = useState(false);
@@ -166,27 +167,44 @@ export default function UserPage() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
 
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          zIndex: 40,
+        }} />
+      )}
+
       {/* Sidebar */}
       <div style={{
         width: 240, background: 'var(--bg-card)', borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column', position: 'fixed',
-        top: 0, left: 0, bottom: 0, zIndex: 50
-      }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
+        top: 0, left: 0, bottom: 0, zIndex: 50,
+        transform: sidebarOpen ? 'translateX(0)' : undefined,
+      }} className={`sidebar ${sidebarOpen ? 'sidebar-mobile-open' : ''}`}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', fontSize: 16, fontWeight: 700, color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           Samagama FAQs
+          <button onClick={() => setSidebarOpen(false)} className="sidebar-close-btn" style={{
+            display: 'none', background: 'transparent', border: 'none',
+            cursor: 'pointer', color: 'var(--text-secondary)', padding: 4,
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
         <div style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
             { label: 'FAQ Hub', path: '/user' },
-{ label: 'Dashboard', path: '/dashboard' },
-...(!isAdminOrSuper ? [
-  { label: 'Ask Question', path: '/ask-question' },
-  { label: 'My Questions', path: '/my-questions' },
-] : []),
-{ label: 'Discussion Room', path: '/answer-center' },
-{ label: 'Leaderboard', path: '/leaderboard' },
+            { label: 'Dashboard', path: '/dashboard' },
+            ...(!isAdminOrSuper ? [
+              { label: 'Ask Question', path: '/ask-question' },
+              { label: 'My Questions', path: '/my-questions' },
+            ] : []),
+            { label: 'Discussion Room', path: '/answer-center' },
+            { label: 'Leaderboard', path: '/leaderboard' },
           ].map(({ label, path }) => (
-            <a key={path} href={path} style={{
+            <a key={path} href={path} onClick={() => setSidebarOpen(false)} style={{
               padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14,
               fontWeight: path === '/user' ? 600 : 500,
               color: path === '/user' ? 'var(--accent)' : 'var(--text-secondary)',
@@ -199,7 +217,7 @@ export default function UserPage() {
             </a>
           ))}
           {isAdminOrSuper && (
-            <a href="/admin" style={{
+            <a href="/admin" onClick={() => setSidebarOpen(false)} style={{
               padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14,
               fontWeight: 500, color: 'var(--text-secondary)', textDecoration: 'none', transition: 'all 150ms ease'
             }}
@@ -236,14 +254,28 @@ export default function UserPage() {
       </div>
 
       {/* Main content */}
-      <div style={{ marginLeft: 240, flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="user-main-content" style={{ marginLeft: 240, flex: 1, display: 'flex', flexDirection: 'column' }}>
         <header style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 24px', borderBottom: '1px solid var(--border)',
           background: 'var(--bg-card)', backdropFilter: 'blur(16px)'
         }}>
-          <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-            Dashboard / <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>FAQ Hub</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={() => setSidebarOpen(o => !o)} className="hamburger-btn" style={{
+              display: 'none', background: 'transparent', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)', padding: '6px 8px',
+              cursor: 'pointer', color: 'var(--text-secondary)',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+              Dashboard / <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>FAQ Hub</span>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <NotificationBell />

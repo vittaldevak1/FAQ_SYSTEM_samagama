@@ -35,7 +35,12 @@ const topScore = sources?.[0]?.score || 0;
 
 let answer, confidence;
 
-if (topScore < 0.25) {
+// Greeting check
+const greetings = /^(hey|hi|hello|hola|sup|yo|bro|wassup|what'?s up|howdy|greetings|good morning|good evening|good afternoon)[\s!?.]*$/i;
+
+if (greetings.test(trimmed)) {
+  ({ answer, confidence } = await generateGeneralAnswer(trimmed));
+} else if (topScore < 0.4) {
   ({ answer, confidence } = await generateGeneralAnswer(trimmed));
 } else {
   ({ answer, confidence } = await generateAnswer(trimmed, sources));

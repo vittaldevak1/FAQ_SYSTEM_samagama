@@ -41,8 +41,6 @@ export default function AuthLayout({ children }) {
         )}
       </button>
 
-      <div className="auth-form-panel">{children}</div>
-
       <div className="auth-brand-panel">
         <div className="brand-content">
           <svg className="brand-logo" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -67,6 +65,8 @@ export default function AuthLayout({ children }) {
           </svg>
         </div>
       </div>
+
+      <div className="auth-form-panel">{children}</div>
     </div>
   );
 }

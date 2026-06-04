@@ -37,6 +37,11 @@ const faqSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    embedding: {
+      type: [Number],
+      default: null,
+      select: false,
+    },
   },
   { timestamps: true }
 );

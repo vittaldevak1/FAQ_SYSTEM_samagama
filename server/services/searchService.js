@@ -59,13 +59,39 @@ function cosineSimilarity(a, b) {
 }
 
 async function buildEmbeddingsCache() {
-  const faqs = await Faq.find({}).select('_id question answer category').lean();
+  // Load FAQs WITH their stored embeddings from DB
+  const faqs = await Faq.find({}).select('_id question answer category embedding').lean();
   console.log(`Building embeddings cache for ${faqs.length} FAQs...`);
+
+  const missing = [];
+
   for (const faq of faqs) {
+    if (faq.embedding && faq.embedding.length > 0) {
+      // Use stored embedding — no Gemini call needed
+      faqEmbeddingsCache.set(faq._id.toString(), {
+        faqId: faq._id.toString(),
+        question: faq.question,
+        category: faq.category,
+        document: `${faq.question} ${faq.answer}`,
+        embedding: faq.embedding,
+      });
+    } else {
+      missing.push(faq);
+    }
+  }
+
+  console.log(`Loaded ${faqEmbeddingsCache.size} embeddings from DB, ${missing.length} need generating...`);
+
+  // Generate and save embeddings for FAQs that don't have them yet
+  for (const faq of missing) {
     try {
       const text = `${faq.question} ${faq.answer}`;
       const embedding = await generateEmbedding(text);
-        await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 150));
+
+      // Save to DB so next restart doesn't need to call Gemini
+      await Faq.findByIdAndUpdate(faq._id, { embedding });
+
       faqEmbeddingsCache.set(faq._id.toString(), {
         faqId: faq._id.toString(),
         question: faq.question,
@@ -73,8 +99,11 @@ async function buildEmbeddingsCache() {
         document: text,
         embedding,
       });
-    } catch { /* skip */ }
+    } catch (e) {
+      console.warn(`Failed to embed FAQ ${faq._id}: ${e.message}`);
+    }
   }
+
   console.log(`Embeddings cache built: ${faqEmbeddingsCache.size} FAQs`);
 }
 
@@ -83,6 +112,9 @@ async function indexFaq(faq) {
 
   const text = `${faq.question} ${faq.answer}`;
   const embedding = await generateEmbedding(text);
+
+  // Save embedding to DB
+  await Faq.findByIdAndUpdate(faq._id, { embedding });
 
   faqEmbeddingsCache.set(faq._id.toString(), {
     faqId: faq._id.toString(),
@@ -105,18 +137,17 @@ async function indexFaq(faq) {
         }],
         documents: [`${faq.question} ${faq.answer}`],
       });
-      return;
     } catch { }
   }
 }
 
 async function deleteFaqIndex(faqId) {
   faqEmbeddingsCache.delete(faqId.toString());
+  // Clear stored embedding from DB
+  await Faq.findByIdAndUpdate(faqId, { embedding: null }).catch(() => {});
   const col = await ensureCollection();
   if (col) {
-    try {
-      await col.delete({ ids: [faqId.toString()] });
-    } catch { }
+    try { await col.delete({ ids: [faqId.toString()] }); } catch { }
   }
 }
 
@@ -133,7 +164,6 @@ async function searchSimilar(query, limit = 5) {
         nResults: limit,
         include: ['metadatas', 'distances', 'documents'],
       });
-
       const sources = [];
       if (result && result.ids && result.ids[0]) {
         for (let i = 0; i < result.ids[0].length; i++) {
@@ -194,7 +224,12 @@ async function generateGeneralAnswer(userQuery) {
       temperature: 0.7,
       max_tokens: 150,
     }, {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LLM_API_KEY}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LLM_API_KEY}`,
+        'HTTP-Referer': 'https://faq-system-samagama.vercel.app',
+        'X-Title': 'FAQ System'
+      },
       timeout: 10000,
     });
     return { answer: data.choices?.[0]?.message?.content?.trim() || 'Hello!', confidence: 0 };
@@ -231,7 +266,12 @@ async function generateAnswer(userQuery, sources) {
       temperature: 0.3,
       max_tokens: 512,
     }, {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LLM_API_KEY}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LLM_API_KEY}`,
+        'HTTP-Referer': 'https://faq-system-samagama.vercel.app',
+        'X-Title': 'FAQ System'
+      },
       timeout: 10000,
     });
     return { answer: data.choices?.[0]?.message?.content?.trim() || '', confidence };
