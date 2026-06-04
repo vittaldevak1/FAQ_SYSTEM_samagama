@@ -5,5 +5,8 @@
     "build": "cd server && npm install",
     "start": "cd server && node server.js",
     "postinstall": "cd server && npm install"
+  },
+  "dependencies": {
+    "resend": "^6.12.4"
   }
 }
