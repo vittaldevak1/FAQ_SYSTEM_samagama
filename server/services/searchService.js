@@ -1,51 +1,13 @@
-const { ChromaClient } = require('chromadb');
 const axios = require('axios');
 const Faq = require('../models/Faq');
 const { generateEmbedding } = require('./embeddingService');
 const { fetchOverview } = require('./internshipOverview');
 
-class NoOpEmbeddingFunction {
-  async generate(texts) {
-    return texts.map(() => []);
-  }
-}
-
-const CHROMA_HOST = process.env.CHROMA_HOST || 'localhost';
-const CHROMA_PORT = parseInt(process.env.CHROMA_PORT, 10) || 8000;
-const CHROMA_COLLECTION = process.env.CHROMA_COLLECTION || 'faq_embeddings';
-
 const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'https://api.openai.com/v1/chat/completions';
 const LLM_API_KEY = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || '';
 const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
 
-let chromaClient = null;
-let collection = null;
-let chromaAvailable = false;
-
 const faqEmbeddingsCache = new Map();
-
-function initChroma() {
-  if (chromaClient) return;
-  try {
-    chromaClient = new ChromaClient({ host: CHROMA_HOST, port: CHROMA_PORT });
-  } catch {
-    chromaAvailable = false;
-  }
-}
-
-async function ensureCollection() {
-  if (collection) return collection;
-  initChroma();
-  if (!chromaClient) return null;
-  try {
-    collection = await chromaClient.getOrCreateCollection({ name: CHROMA_COLLECTION, embeddingFunction: new NoOpEmbeddingFunction() });
-    chromaAvailable = true;
-    return collection;
-  } catch {
-    chromaAvailable = false;
-    return null;
-  }
-}
 
 function cosineSimilarity(a, b) {
   let dot = 0, na = 0, nb = 0;
@@ -59,7 +21,6 @@ function cosineSimilarity(a, b) {
 }
 
 async function buildEmbeddingsCache() {
-  // Load FAQs WITH their stored embeddings from DB
   const faqs = await Faq.find({}).select('_id question answer category embedding').lean();
   console.log(`Building embeddings cache for ${faqs.length} FAQs...`);
 
@@ -67,7 +28,6 @@ async function buildEmbeddingsCache() {
 
   for (const faq of faqs) {
     if (faq.embedding && faq.embedding.length > 0) {
-      // Use stored embedding — no Gemini call needed
       faqEmbeddingsCache.set(faq._id.toString(), {
         faqId: faq._id.toString(),
         question: faq.question,
@@ -82,16 +42,12 @@ async function buildEmbeddingsCache() {
 
   console.log(`Loaded ${faqEmbeddingsCache.size} embeddings from DB, ${missing.length} need generating...`);
 
-  // Generate and save embeddings for FAQs that don't have them yet
   for (const faq of missing) {
     try {
       const text = `${faq.question} ${faq.answer}`;
       const embedding = await generateEmbedding(text);
       await new Promise(r => setTimeout(r, 150));
-
-      // Save to DB so next restart doesn't need to call Gemini
       await Faq.findByIdAndUpdate(faq._id, { embedding });
-
       faqEmbeddingsCache.set(faq._id.toString(), {
         faqId: faq._id.toString(),
         question: faq.question,
@@ -109,13 +65,9 @@ async function buildEmbeddingsCache() {
 
 async function indexFaq(faq) {
   if (!faq || !faq._id) throw new Error('Valid FAQ with _id is required');
-
   const text = `${faq.question} ${faq.answer}`;
   const embedding = await generateEmbedding(text);
-
-  // Save embedding to DB
   await Faq.findByIdAndUpdate(faq._id, { embedding });
-
   faqEmbeddingsCache.set(faq._id.toString(), {
     faqId: faq._id.toString(),
     question: faq.question,
@@ -123,64 +75,17 @@ async function indexFaq(faq) {
     document: text,
     embedding,
   });
-
-  const col = await ensureCollection();
-  if (col) {
-    try {
-      await col.upsert({
-        ids: [faq._id.toString()],
-        embeddings: [embedding],
-        metadatas: [{
-          faqId: faq._id.toString(),
-          question: faq.question,
-          category: faq.category || '',
-        }],
-        documents: [`${faq.question} ${faq.answer}`],
-      });
-    } catch { }
-  }
 }
 
 async function deleteFaqIndex(faqId) {
   faqEmbeddingsCache.delete(faqId.toString());
-  // Clear stored embedding from DB
   await Faq.findByIdAndUpdate(faqId, { embedding: null }).catch(() => {});
-  const col = await ensureCollection();
-  if (col) {
-    try { await col.delete({ ids: [faqId.toString()] }); } catch { }
-  }
 }
 
 async function searchSimilar(query, limit = 5) {
   if (!query || query.trim().length < 3) return [];
 
   const queryEmbedding = await generateEmbedding(query);
-  const col = await ensureCollection();
-
-  if (col && chromaAvailable) {
-    try {
-      const result = await col.query({
-        queryEmbeddings: [queryEmbedding],
-        nResults: limit,
-        include: ['metadatas', 'distances', 'documents'],
-      });
-      const sources = [];
-      if (result && result.ids && result.ids[0]) {
-        for (let i = 0; i < result.ids[0].length; i++) {
-          const dist = result.distances?.[0]?.[i] || 0;
-          const score = Math.max(0, Math.min(1, 1 - dist / 2));
-          sources.push({
-            faqId: result.ids[0][i],
-            question: result.metadatas?.[0]?.[i]?.question || '',
-            category: result.metadatas?.[0]?.[i]?.category || '',
-            document: result.documents?.[0]?.[i] || '',
-            score: Math.round(score * 100) / 100,
-          });
-        }
-      }
-      return sources.sort((a, b) => b.score - a.score);
-    } catch { }
-  }
 
   if (faqEmbeddingsCache.size === 0) {
     await buildEmbeddingsCache();
@@ -252,8 +157,7 @@ async function generateAnswer(userQuery, sources) {
 
   if (!LLM_API_KEY) {
     const best = sources[0];
-    const answer = best.document.replace(best.question, '').trim();
-    return { answer: answer || best.question, confidence };
+    return { answer: best.document.replace(best.question, '').trim() || best.question, confidence };
   }
 
   try {
@@ -293,10 +197,6 @@ async function indexAllFaqs() {
 }
 
 async function indexOverview() {
-  const existingIds = ['overview-about', 'overview-badges', 'overview-expectations', 'overview-project', 'overview-interview', 'overview-logistics', 'overview-cost'];
-  const col = await ensureCollection();
-  if (col) { try { await col.delete({ ids: existingIds }); } catch { } }
-
   let data;
   try { data = await fetchOverview(); } catch { return; }
   if (!data?.sections?.length) return;
@@ -314,18 +214,17 @@ async function indexOverview() {
   for (const sec of sections) {
     if (!sec.text) continue;
     const text = `${sec.title}. ${sec.text}`;
-    const embedding = await generateEmbedding(text);
-    const col2 = await ensureCollection();
-    if (col2) {
-      try {
-        await col2.upsert({
-          ids: [sec.id],
-          embeddings: [embedding],
-          metadatas: [{ faqId: sec.id, question: sec.title, category: 'programme-overview' }],
-          documents: [text],
-        });
-      } catch { }
-    }
+    try {
+      const embedding = await generateEmbedding(text);
+      await new Promise(r => setTimeout(r, 150));
+      faqEmbeddingsCache.set(sec.id, {
+        faqId: sec.id,
+        question: sec.title,
+        category: 'programme-overview',
+        document: text,
+        embedding,
+      });
+    } catch { }
   }
 }
 
