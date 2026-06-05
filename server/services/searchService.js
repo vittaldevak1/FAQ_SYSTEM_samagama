@@ -3,9 +3,8 @@ const Faq = require('../models/Faq');
 const { generateEmbedding } = require('./embeddingService');
 const { fetchOverview } = require('./internshipOverview');
 
-const LLM_ENDPOINT = process.env.LLM_ENDPOINT || 'https://api.openai.com/v1/chat/completions';
-const LLM_API_KEY = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || '';
-const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = 'llama3-8b-8192';
 
 const faqEmbeddingsCache = new Map();
 
@@ -116,14 +115,14 @@ async function getSuggestions(query) {
 }
 
 async function generateGeneralAnswer(userQuery) {
-  if (!LLM_API_KEY) {
+  if (!GROQ_API_KEY) {
     return { answer: "Hello! How can I help you today?", confidence: 0 };
   }
   try {
-    const { data } = await axios.post(LLM_ENDPOINT, {
-      model: LLM_MODEL,
+    const { data } = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: 'You are a friendly chatbot. Respond naturally to greetings, small talk, and general conversation. Keep responses short.' },
+        { role: 'system', content: 'You are a friendly chatbot for Samagama internship FAQ system. Respond naturally to greetings and small talk. Keep responses short and friendly.' },
         { role: 'user', content: userQuery },
       ],
       temperature: 0.7,
@@ -131,9 +130,7 @@ async function generateGeneralAnswer(userQuery) {
     }, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${LLM_API_KEY}`,
-        'HTTP-Referer': 'https://faq-system-samagama.vercel.app',
-        'X-Title': 'FAQ System'
+        Authorization: `Bearer ${GROQ_API_KEY}`,
       },
       timeout: 10000,
     });
@@ -145,7 +142,7 @@ async function generateGeneralAnswer(userQuery) {
 
 async function generateAnswer(userQuery, sources) {
   if (!sources || sources.length === 0) {
-    return { answer: 'No relevant information found in the knowledge base.', confidence: 0 };
+    return { answer: 'No relevant information found.', confidence: 0 };
   }
 
   const context = sources
@@ -155,16 +152,16 @@ async function generateAnswer(userQuery, sources) {
   const avgScore = sources.reduce((sum, s) => sum + s.score, 0) / sources.length;
   const confidence = Math.round(avgScore * 100) / 100;
 
-  if (!LLM_API_KEY) {
+  if (!GROQ_API_KEY) {
     const best = sources[0];
     return { answer: best.document.replace(best.question, '').trim() || best.question, confidence };
   }
 
   try {
-    const { data } = await axios.post(LLM_ENDPOINT, {
-      model: LLM_MODEL,
+    const { data } = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: 'You are a helpful FAQ assistant. Answer the user\'s question based only on the provided context. Be concise and direct.' },
+        { role: 'system', content: 'You are a helpful FAQ assistant for Samagama internship. Answer based only on the provided context. Be concise and direct.' },
         { role: 'user', content: `Context:\n${context}\n\nQuestion: ${userQuery}\n\nAnswer based only on the context above.` },
       ],
       temperature: 0.3,
@@ -172,9 +169,7 @@ async function generateAnswer(userQuery, sources) {
     }, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${LLM_API_KEY}`,
-        'HTTP-Referer': 'https://faq-system-samagama.vercel.app',
-        'X-Title': 'FAQ System'
+        Authorization: `Bearer ${GROQ_API_KEY}`,
       },
       timeout: 10000,
     });

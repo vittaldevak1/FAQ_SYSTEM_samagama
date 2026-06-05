@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [lockoutTimer, setLockoutTimer] = useState(null);
+  const [selectedRole, setSelectedRole] = useState(null);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -86,43 +87,46 @@ export default function LoginPage() {
       </div>
 
       <div className="role-tabs">
-        <button
-          type="button"
-          className="role-tab role-tab-admin"
-          onClick={() => {
-            setForm({ email: 'sudarshansudarshan@gmail.com', password: 'Admin@123' });
-            setErrors({});
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          <div className="role-tab-text">
-            <span className="role-tab-title">Admin</span>
-            <span className="role-tab-sub">sudarshansudarshan@gmail.com</span>
-          </div>
-        </button>
-        <button
-          type="button"
-          className="role-tab role-tab-intern"
-          onClick={() => {
-            setForm({ email: 'test@example.com', password: 'Test@1234' });
-            setErrors({});
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          <div className="role-tab-text">
-            <span className="role-tab-title">Intern</span>
-            <span className="role-tab-sub">test@example.com</span>
-          </div>
-        </button>
-      </div>
+  <button
+    type="button"
+    className={`role-tab role-tab-admin ${selectedRole === 'admin' ? 'role-tab-selected' : ''}`}
+    onClick={() => {
+      setSelectedRole('admin');
+      //setForm({ email: 'sudarshansudarshan@gmail.com', password: 'Admin@123' });
+      setErrors({});
+    }}
+  >
+    <div className="role-tab-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    </div>
+    <span className="role-tab-title">Admin</span>
+    {selectedRole === 'admin' && <span className="role-tab-check">✓</span>}
+  </button>
+
+  <button
+    type="button"
+    className={`role-tab role-tab-intern ${selectedRole === 'intern' ? 'role-tab-selected' : ''}`}
+    onClick={() => {
+      setSelectedRole('intern');
+      //setForm({ email: 'test@example.com', password: 'Test@1234' });
+      setErrors({});
+    }}
+  >
+    <div className="role-tab-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    </div>
+    <span className="role-tab-title">Intern</span>
+    {selectedRole === 'intern' && <span className="role-tab-check">✓</span>}
+  </button>
+</div>
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">
